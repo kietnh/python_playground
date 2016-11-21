@@ -2,7 +2,9 @@ from flask import Flask, render_template, request, redirect
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.security import Security, SQLAlchemyUserDatastore, UserMixin, RoleMixin, login_required
 from flask_security import auth_token_required, http_auth_required, current_user
-from flask.ext.security.utils import encrypt_password, verify_password, logout_user
+from flask.ext.security.utils import encrypt_password, verify_password, logout_user, login_user
+
+from raven.contrib.flask import Sentry
 
 # Create app
 app = Flask(__name__)
@@ -10,6 +12,9 @@ app.secret_key = 'taca-dada'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////security.db'
 app.config['SECURITY_PASSWORD_HASH'] = 'sha512_crypt'
 app.config['SECURITY_PASSWORD_SALT'] = 'fhasdgihwntlgy8f'
+
+# Setup logging
+sentry = Sentry(app, dsn='https://5fca3bbbd4d74f45b25519314ccfecc8:bce14e18265140b19ecfbef40f1ef6c6@sentry.io/116149?timeout=10000')
 
 # Create database connection object
 db = SQLAlchemy(app)
@@ -47,10 +52,18 @@ security = Security(app, user_datastore)
 # Views
 @app.route('/')
 def home():
+    sentry.captureMessage('hello, world!')
     return render_template('index.html')
 
+@app.route('/logintest')
+def login():
+    user = user_datastore.get_user('matt@nobien.net')
+    login_user(user)
+
+    return user.email
+
 @app.route('/protected', methods=['GET'])
-@http_auth_required
+@login_required
 def protected():
     if current_user.is_authenticated:
         if(verify_password('password', current_user.password)):
@@ -61,7 +74,7 @@ def protected():
         return "User is NOT authenticated"
 
 @app.route('/logout', methods=['GET'])
-@http_auth_required
+@login_required
 def logout():
     logout_user()
     return redirect("/")
