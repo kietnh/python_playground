@@ -1,16 +1,18 @@
 from flask import Flask, render_template, request, redirect
-from flask.ext.sqlalchemy import SQLAlchemy
-from flask.ext.security import Security, SQLAlchemyUserDatastore, UserMixin, RoleMixin, login_required
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy_utils import database_exists, create_database
+from flask_security import Security, SQLAlchemyUserDatastore, UserMixin, RoleMixin, login_required
 from flask_security import auth_token_required, http_auth_required, current_user
-from flask.ext.security.utils import encrypt_password, verify_password, logout_user, login_user
+from flask_security.utils import encrypt_password, verify_password, logout_user, login_user
 
 from raven.contrib.flask import Sentry
 
 # Create app
 app = Flask(__name__)
 app.secret_key = 'taca-dada'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////security.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:abc123@localhost/python_playground'
 app.config['SECURITY_PASSWORD_HASH'] = 'sha512_crypt'
+# app.config['SECURITY_PASSWORD_HASH'] = 'bcrypt'
 app.config['SECURITY_PASSWORD_SALT'] = 'fhasdgihwntlgy8f'
 
 # Setup logging
@@ -43,16 +45,19 @@ user_datastore = SQLAlchemyUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
 
 # Create a user to test with
-# @app.before_first_request
-# def create_user():
-#     db.create_all()
-#     user_datastore.create_user(email='matt@nobien.net', password=encrypt_password('password'))
-#     db.session.commit()
+@app.before_first_request
+def create_user():
+    if(not database_exists(app.config['SQLALCHEMY_DATABASE_URI'])):
+        create_database(app.config['SQLALCHEMY_DATABASE_URI'])
+
+        db.create_all()
+        user_datastore.create_user(email='matt@nobien.net', password=encrypt_password('password'))
+        db.session.commit()
 
 # Views
 @app.route('/')
 def home():
-    sentry.captureMessage('hello, world!')
+    # sentry.captureMessage('hello, world!')
     return render_template('index.html')
 
 @app.route('/logintest')
